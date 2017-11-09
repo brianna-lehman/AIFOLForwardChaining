@@ -1,0 +1,35 @@
+rule - American(x) ^ Weapon(y) ^ Nation(z) ^ Hastile(z) ^ Sells(x,z,y) -> Criminal(x)
+atom/fact - American(West)
+
+whenever a fact comes in unify it with one of the variables in a rule (American(West)/American(x))
+if all the atoms in a rule are facts add the implication to the list of facts
+
+for each line in file
+	if line contains '->'
+		line is a rule
+		split line on the ' ^ ' and ' -> '
+			put each atom/implication into a dictionary
+				{American(x): False, Weapon(y): False, Nation(z): False, Hostile(z): False, Sells(x,z,y): False, Criminal(x): False}
+			put dictionary into a list of dictionaries
+
+	else if line contains 'PROVE'
+		remove 'PROVE ' from line
+		put remaining string into prove variable
+
+	else
+		put line into list of facts
+		if line = prove
+			proved = True
+		else
+			unify this fact's constant w/ any possible variables in the rules
+				fact = American(West)
+				substitution = {x/West}
+				set rules[American(x)] = True
+				if all the rules except for the last one in the dictionary are true
+					rules[-1] = True
+
+					replace variable in the rule w/ it's constant substitution
+
+					add new fact to list of facts
+
+			set the value in the dictionary of rules to true if this fact is equal to that rule

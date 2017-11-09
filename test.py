@@ -1,79 +1,9 @@
-import sys
 import re
-import pdb
-
-rules = {}
-implied_rules = []
-facts = []
-prove = None
 
 def main():
-	i = 0
-	with open(sys.argv[1], 'r') as kb:
-		for line in kb:
-			if '->' in line:
-				# remove newline from line
-				line = line[:-1]
-
-				pattern = re.compile(r"  \^  |  ->  ")
-				rule_list = pattern.split(line)
-
-				atoms = [rule for rule in rule_list[:-1]]
-				implied_rules.append(rule_list[-1])
-				rules[i] = atoms
-				i += 1
-				print("%s added to kb" %line)
-
-			elif 'PROVE' in line:
-				# remove 'PROVE   ' from line
-				global prove
-				prove = line[8:]
-				print("P%s added to kb" %prove)
-
-			else:
-				line = line[:-1]
-				facts.append(line)
-				print("%s added to kb" %line)
-
-	for fact in facts:
-		checkFact(fact)
-	print("%s is not provable" %prove)
-
-def checkFact(fact):
-	print("%s == %s" %(fact,prove))
-	if fact == prove:
-		print("%s is proved" %fact)
-		exit()
-
-	if fact not in facts:
-		facts.append(fact)
-
-	for index, rule_list in rules.items():
-		all_rules_proved = True
-		for rule in rule_list:
-			substitutions = unify(rule,fact)
-			if substitutions is not None:
-				# for every substitution
-				for var, const in substitutions.items():
-					# check every rule in the list to see if var can be replaced
-					for i, r in enumerate(rule_list):
-						if var in getValues(r):
-							rule_list[i] = replace(r,var,const)
-
-					# check the implied rule associated with this list for variables
-					# that can be substituted
-					implied_rule = implied_rules[index]
-					if var in getValues(implied_rule):
-						implied_rules[index] = replace(implied_rule,var,const)
-
-			if hasVariable(rule):
-				all_rules_proved = False
-
-		if all_rules_proved \
-		   and not hasVariable(implied_rules[index]) \
-		   and implied_rules[index] not in facts:
-			checkFact(implied_rules[index])
-
+	rules = ["American(x)", "Weapon(y)", "Nation(z)", "Hostile(z)", "Sells(x,z,y)", "Criminal(x)"]
+	dictionary_of_rules = {x:False for x in rules[:-1]}
+	print(dictionary_of_rules)
 
 def unify(rule, fact):
 	# if the variables in rule can be matched w/ the constants in fact
@@ -81,15 +11,22 @@ def unify(rule, fact):
 	substitutions = {}
 	removeRuleConstants = []
 	rule_vals = getValues(rule)
+	print("\tRule values - %s: %s" %(rule,rule_vals))
 	fact_vals = getValues(fact)
+	print("\tFact values - %s: %s" %(fact,fact_vals))
 
 	if getPredicate(rule) != getPredicate(fact) or len(rule_vals) != len(fact_vals):
+		print("\t%s != %s or %d != %d" %(getPredicate(rule), getPredicate(fact), len(rule_vals), len(fact_vals)))
 		return None
 	if len(rule_vals) == len(fact_vals):
+		print("\t%s == %s" %(len(rule_vals), len(fact_vals)))
 		substitutions = dict(zip(rule_vals, fact_vals))
+		print("\t%s" %substitutions)
 
 	for a1, a2 in substitutions.items():
+		print("\t%s:%s" %(a1,a2))
 		if not isVariable(a1) and not isVariable(a2) and (a1 != a2):
+			print("\t%s and %s and (%s != %s)" %(isConstant(a1),isConstant(a2),a1,a2))
 			return None
 		if not isVariable(a1):
 			removeRuleConstants.append(a1)
@@ -104,7 +41,9 @@ def replace(rule, variable, constant):
 	return re.sub(pattern, constant, rule)
 
 def isVariable(val):
+	print("\t\t%s" %val)
 	if len(val) == 1 and val.islower():
+		print("\t\t%s == 1 and %s" %(len(val),val.islower()))
 		return True
 	else:
 		return False
