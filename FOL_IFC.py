@@ -15,38 +15,43 @@ def main():
 				# remove newline from line
 				line = line[:-1]
 
-				pattern = re.compile(r"  \^  |  ->  ")
+				pattern = re.compile(r"\s*[\^]\s*|\s*->\s*")
 				rule_list = pattern.split(line)
 
 				atoms = [rule for rule in rule_list[:-1]]
 				implied_rules.append(rule_list[-1])
 				rules[i] = atoms
+				print("%d: %s" %(i,rules[i]))
 				i += 1
-				print("%s added to kb" %line)
 
 			elif 'PROVE' in line:
 				# remove 'PROVE   ' from line
 				global prove
-				prove = line[8:]
-				print("P%s added to kb" %prove)
+
+				pattern = re.compile(r"PROVE\s*")
+				prove = pattern.sub("", line)
 
 			else:
 				line = line[:-1]
 				facts.append(line)
-				print("%s added to kb" %line)
+				print("%s added to list of facts" %line)
+
+	print("Implied rules: %s" %implied_rules)
 
 	for fact in facts:
 		checkFact(fact)
 	print("%s is not provable" %prove)
 
 def checkFact(fact):
-	print("%s == %s" %(fact,prove))
 	if fact == prove:
 		print("%s is proved" %fact)
 		exit()
 
 	if fact not in facts:
+		print("Infered fact %s added to list of facts" %fact)
 		facts.append(fact)
+
+	print("Checking %s against rules" %fact)
 
 	for index, rule_list in rules.items():
 		all_rules_proved = True

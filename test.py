@@ -1,9 +1,14 @@
 import re
+import pdb
 
 def main():
-	rules = ["American(x)", "Weapon(y)", "Nation(z)", "Hostile(z)", "Sells(x,z,y)", "Criminal(x)"]
-	dictionary_of_rules = {x:False for x in rules[:-1]}
-	print(dictionary_of_rules)
+	rules = ["Sibling(y,z)","Cousin(y,w)","Distinct(y,x)"]
+	facts = ["Sibling(y,z)","Cousin(y,w)","Distinct(y,x)", "Blah(t,q)"]
+	print(contains(rules,facts))
+
+def contains(list_of_rules, list_of_facts):
+	pdb.set_trace()
+	set(list_of_rules).issubset(list_of_facts)
 
 def unify(rule, fact):
 	# if the variables in rule can be matched w/ the constants in fact
