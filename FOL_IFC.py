@@ -2,15 +2,17 @@ import sys
 import re
 import pdb
 
-rules = {}
-implied_rules = []
-facts = []
+statements = {}
+inferred_rules = []
+kb = []
 prove = None
+inferred_arguments = []
 
 def main():
 	i = 0
-	with open(sys.argv[1], 'r') as kb:
-		for line in kb:
+	filename = sys.argv[1]
+	with open(filename, 'r') as file:
+		for line in file:
 			if '->' in line:
 				# remove newline from line
 				line = line[:-1]
@@ -18,10 +20,10 @@ def main():
 				pattern = re.compile(r"\s*[\^]\s*|\s*->\s*")
 				rule_list = pattern.split(line)
 
-				atoms = [rule for rule in rule_list[:-1]]
-				implied_rules.append(rule_list[-1])
-				rules[i] = atoms
-				print("%d: %s" %(i,rules[i]))
+				atoms = [rule.replace(" ", "") for rule in rule_list[:-1]]
+				inferred_rules.append(rule_list[-1])
+				statements[i] = atoms
+				print("%d: %s -> %s" %(i,statements[i],inferred_rules[i]))
 				i += 1
 
 			elif 'PROVE' in line:
@@ -29,56 +31,66 @@ def main():
 				global prove
 
 				pattern = re.compile(r"PROVE\s*")
-				prove = pattern.sub("", line)
+				prove = pattern.sub("", line).replace(" ", "")
 
 			else:
 				line = line[:-1]
-				facts.append(line)
-				print("%s added to list of facts" %line)
+				kb.append(line.replace(" ", ""))
 
-	print("Implied rules: %s" %implied_rules)
+	print("List of kb: %s" %kb)
+	print("Prove: %s" %prove)
 
-	for fact in facts:
-		checkFact(fact)
-	print("%s is not provable" %prove)
+	proved = check()
 
-def checkFact(fact):
-	if fact == prove:
-		print("%s is proved" %fact)
-		exit()
+	if proved == True:
+		print("%s is true" %prove)
+	else:
+		print("%s is unprovable" %prove)
 
-	if fact not in facts:
-		print("Infered fact %s added to list of facts" %fact)
-		facts.append(fact)
+	createTranscript(filename,proved)
 
-	print("Checking %s against rules" %fact)
+def check():
+	new = ["temp"]
 
-	for index, rule_list in rules.items():
-		all_rules_proved = True
-		for rule in rule_list:
-			substitutions = unify(rule,fact)
-			if substitutions is not None:
-				# for every substitution
-				for var, const in substitutions.items():
-					# check every rule in the list to see if var can be replaced
-					for i, r in enumerate(rule_list):
-						if var in getValues(r):
-							rule_list[i] = replace(r,var,const)
+	while new:
+		new = []
+		for index, statement in statements.items():
+			temp_kb = kb[:]
+			conclusion = inferred_rules[index]
+			print("Looking at statement %s -> %s" %(statement,conclusion))
+			for atom in statement:
+				if hasVariable(atom):
+					print("Atom to look at this iteration: %s" %atom)
+					print("Facts to look at this iteration: %s" %temp_kb)
+					fact = getFact(atom,temp_kb)
+					print("%s unifiable with %s" %(atom,fact))
+					if fact is not None:
+						substitutions = unify(atom,fact)
+						for var,const in substitutions.items():
+							for i,a in enumerate(statement):
+								print("Replace %s in %s with %s" %(var,a,const))
+								statement[i] = replace(a,var,const)
+							if var in getValues(conclusion):
+								inferred_rules[index] = replace(conclusion,var,const)
+								conclusion = inferred_rules[index]
+						temp_kb.remove(fact)
+						print("Modified list of facts to look at next iteration: %s" %temp_kb)
 
-					# check the implied rule associated with this list for variables
-					# that can be substituted
-					implied_rule = implied_rules[index]
-					if var in getValues(implied_rule):
-						implied_rules[index] = replace(implied_rule,var,const)
+				print("Statement: %s -> %s" %(statement,conclusion))
 
-			if hasVariable(rule):
-				all_rules_proved = False
+			if not statementHasVariable(statement) \
+			and not hasVariable(conclusion) \
+			and conclusion not in kb \
+			and conclusion not in new:
+				print("Add %s to kb" %conclusion)
+				new.append(conclusion)
+				inferred_arguments.append(conclusion)
 
-		if all_rules_proved \
-		   and not hasVariable(implied_rules[index]) \
-		   and implied_rules[index] not in facts:
-			checkFact(implied_rules[index])
+				if conclusion == prove:
+					return True
+		kb.extend(new)
 
+	return False
 
 def unify(rule, fact):
 	# if the variables in rule can be matched w/ the constants in fact
@@ -104,9 +116,68 @@ def unify(rule, fact):
 
 	return substitutions
 
+def createTranscript(filename,proved):
+	filename = format(filename)
+	transcript = open(str(filename)+"_out_IFC.txt", "w")
+	transcript.write("Inferred Arguments: %s" %inferred_arguments)
+	if proved:
+		transcript.write("\n%s is proved" %prove)
+	else:
+		transcript.write("\n%s is unprovable" %prove)
+	transcript.close()
+
+def format(string):
+
+	if "\\" in string:
+		val = string.split("\\")[1]
+	if "/" in string:
+		val = string.split("/")[1]
+
+	return val
+
+
 def replace(rule, variable, constant):
 	pattern = r"(?<=\(|,)("+variable+")"
 	return re.sub(pattern, constant, rule)
+
+def getInferredRule(fact):
+	for rule in inferred_rules:
+		if getPredicate(rule) == getPredicate(fact):
+			return rule
+	return None
+
+def getRulesDictionary(conclusion):
+	try:
+		value_index = inferred_rules.index(conclusion)
+	except:
+		value_index = -1
+
+	if value_index != -1:
+		return value_index, statements[value_index]
+	else:
+		return value_index, None
+
+def predicateInFacts(rule):
+	for fact in kb:
+		if getPredicate(rule) == getPredicate(fact):
+			return True
+	return False
+
+def getFact(rule,facts=kb):
+	for f in facts:
+		if getPredicate(rule) == getPredicate(f):
+			values_dict = dict(zip(getValues(rule), getValues(f)))
+			for r_val, f_val in values_dict.items():
+				if not isVariable(r_val) and r_val != f_val:
+					return None
+			return f
+	return None
+
+def statementHasVariable(list):
+	for atom in list:
+		if hasVariable(atom):
+			return True
+	return False
 
 def isVariable(val):
 	if len(val) == 1 and val.islower():
@@ -116,6 +187,9 @@ def isVariable(val):
 
 def isConstant(val):
 	return not isVariable(val)
+
+def contains(list_of_rules, list_of_facts):
+	set(list_of_rules).issubset(list_of_facts)
 
 def hasVariable(atom):
 	# returns true if any value inside predicate() is a variable
@@ -139,6 +213,7 @@ def getValues(atom):
 	if value_match:
 		value_str = value_match.group(0)
 		value_str = value_str[1:-1]
+		value_str = value_str.replace(" ", "")
 		return value_str.split(",")
 	else:
 		return None
